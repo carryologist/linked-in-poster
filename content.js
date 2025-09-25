@@ -2,14 +2,15 @@
 
 // Listen for messages from background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'captureSelection') {
-    captureSelectedContent();
+  if (request.action === 'captureContent' || request.action === 'captureSelection') {
+    captureContent();
     sendResponse({ success: true }); // Acknowledge the message
   }
+  return true; // Keep the message channel open for async response
 });
 
 // Capture selected text and process it
-function captureSelectedContent() {
+function captureContent() {
   const selectedText = window.getSelection().toString().trim();
   
   if (!selectedText) {

@@ -32,9 +32,20 @@ chrome.runtime.onInstalled.addListener(() => {
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'capture-for-linkedin' && info.selectionText) {
-    // Send message to content script
-    chrome.tabs.sendMessage(tab.id, {
-      action: 'captureContent'
+    // First try to send message to existing content script
+    chrome.tabs.sendMessage(tab.id, { action: 'captureContent' }, (response) => {
+      if (chrome.runtime.lastError) {
+        // Content script not loaded, inject it
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content.js']
+        }, () => {
+          // After injection, send the message
+          setTimeout(() => {
+            chrome.tabs.sendMessage(tab.id, { action: 'captureContent' });
+          }, 100);
+        });
+      }
     });
   }
 });
@@ -45,12 +56,19 @@ chrome.commands.onCommand.addListener((command) => {
     // Get the active tab
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]) {
-        // Send message to content script to capture selected text
-        chrome.tabs.sendMessage(tabs[0].id, { action: 'captureSelection' }, (response) => {
-          // Handle potential connection errors
+        // First try to send message to existing content script
+        chrome.tabs.sendMessage(tabs[0].id, { action: 'captureContent' }, (response) => {
           if (chrome.runtime.lastError) {
-            console.log('Content script not available on this page:', chrome.runtime.lastError.message);
-            // Could show a notification or badge here if needed
+            // Content script not loaded, inject it
+            chrome.scripting.executeScript({
+              target: { tabId: tabs[0].id },
+              files: ['content.js']
+            }, () => {
+              // After injection, send the message
+              setTimeout(() => {
+                chrome.tabs.sendMessage(tabs[0].id, { action: 'captureContent' });
+              }, 100);
+            });
           }
         });
       }
