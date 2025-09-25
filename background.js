@@ -166,9 +166,11 @@ Respond in JSON format:
 {
   "linkedinPost": "[The complete LinkedIn post with emojis]",
   "characterCount": [number of characters],
-  "category": "${categories.join(', ')} or suggest new",
-  "isNewCategory": true/false
+  "category": "[Choose ONLY ONE best-fit category from: ${categories.join(', ')}]",
+  "isNewCategory": false
 }
+
+IMPORTANT: Select only ONE category that best fits the content. Do not provide multiple categories.
 `;
     
     console.log('Using model:', selectedModel); // Debug logging
@@ -197,7 +199,13 @@ Respond in JSON format:
     }
     
     const data = await response.json();
-    const aiResult = JSON.parse(data.choices[0].message.content);
+    let aiResult = JSON.parse(data.choices[0].message.content);
+    
+    // Ensure we only have one category (in case AI returns multiple)
+    if (aiResult.category && aiResult.category.includes(',')) {
+      // If multiple categories are returned, take only the first one
+      aiResult.category = aiResult.category.split(',')[0].trim();
+    }
     
     return {
       ...aiResult,
