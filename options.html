@@ -299,9 +299,14 @@
       <!-- Categories will be populated by JavaScript -->
     </div>
     
-    <div class="add-category">
-      <input type="text" id="newCategoryInput" placeholder="Add new category...">
-      <button class="btn btn-secondary" id="addCategoryBtn">Add</button>
+    <div class="category-input">
+      <input type="text" id="newCategory" placeholder="Add new category">
+      <button id="addCategoryBtn">Add Category</button>
+    </div>
+    
+    <div style="margin-top: 15px;">
+      <button type="button" id="resetCategoriesBtn" style="padding: 10px 20px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer;">Reset to Default Categories</button>
+      <span style="margin-left: 10px; color: #6b7280; font-size: 14px;">This will replace all categories with LinkedIn-focused defaults</span>
     </div>
   </div>
   

@@ -8,12 +8,16 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.sync.get(['categories'], (result) => {
     if (!result.categories) {
       const defaultCategories = [
-        'Employee Milestones',
-        'Customer Wins',
-        'Product Announcements',
-        'Company News',
-        'Industry Updates',
-        'Team Updates'
+        '🚀 Developer Productivity',
+        '🤖 AI/ML Engineering',
+        '🏗️ Tech Infrastructure',
+        '💡 Industry Insights',
+        '🛠️ Product Innovation',
+        '🎯 Leadership & Culture',
+        '📊 Tech Strategy',
+        '🔮 Future of Development',
+        '📚 Lessons Learned',
+        '🤝 Community & Open Source'
       ];
       chrome.storage.sync.set({ categories: defaultCategories });
     }

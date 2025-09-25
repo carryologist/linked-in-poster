@@ -57,7 +57,7 @@ function setupEventListeners() {
   
   // Add category
   document.getElementById('addCategoryBtn').addEventListener('click', addCategory);
-  document.getElementById('newCategoryInput').addEventListener('keypress', (e) => {
+  document.getElementById('newCategory').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
       addCategory();
     }
@@ -232,7 +232,7 @@ async function displayCategories(categories) {
 }
 
 async function addCategory() {
-  const input = document.getElementById('newCategoryInput');
+  const input = document.getElementById('newCategory');
   const newCategory = input.value.trim();
   
   if (!newCategory) return;
@@ -290,6 +290,31 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Add save button listener
   document.getElementById('saveBtn').addEventListener('click', saveSettings);
+  
+  // Add reset categories button listener
+  const resetBtn = document.getElementById('resetCategoriesBtn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', async () => {
+      if (confirm('This will replace all your current categories with the default LinkedIn categories. Continue?')) {
+        const defaultCategories = [
+          '🚀 Developer Productivity',
+          '🤖 AI/ML Engineering',
+          '🏗️ Tech Infrastructure',
+          '💡 Industry Insights',
+          '🛠️ Product Innovation',
+          '🎯 Leadership & Culture',
+          '📊 Tech Strategy',
+          '🔮 Future of Development',
+          '📚 Lessons Learned',
+          '🤝 Community & Open Source'
+        ];
+        
+        await chrome.storage.sync.set({ categories: defaultCategories });
+        displayCategories(defaultCategories);
+        showStatusMessage('Categories reset to LinkedIn defaults', 'success');
+      }
+    });
+  }
   
   // Add debug button listener
   const debugBtn = document.getElementById('debugBtn');
