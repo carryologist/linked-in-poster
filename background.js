@@ -58,7 +58,7 @@ async function processContentWithAI(contentData) {
       throw new Error('OpenAI API key not configured. Please set it in the extension options.');
     }
     
-    const selectedModel = openaiModel || 'gpt-5-mini'; // Default to gpt-5-mini if not set
+    const selectedModel = openaiModel || 'gpt-5-mini'; // Default to gpt-5-mini - latest OpenAI model
     
     // Get current categories
     const { categories } = await chrome.storage.sync.get(['categories']);
@@ -92,6 +92,8 @@ Respond in JSON format:
 }
 `;
     
+    console.log('Using model:', selectedModel); // Debug logging
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -110,7 +112,9 @@ Respond in JSON format:
     });
     
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errorData = await response.text();
+      console.error('OpenAI API error response:', errorData);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
     }
     
     const data = await response.json();
