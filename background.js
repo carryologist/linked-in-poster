@@ -221,7 +221,9 @@ async function saveToNotion(summaryData) {
     });
     
     if (!response.ok) {
-      throw new Error(`Notion API error: ${response.status}`);
+      const errorData = await response.json();
+      console.error('Notion API error:', errorData);
+      throw new Error(`Notion API error: ${response.status} - ${errorData.message || JSON.stringify(errorData)}`);
     }
     
     return await response.json();

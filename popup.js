@@ -46,8 +46,8 @@ function showReviewInterface(data) {
       <div class="section-title">Original Text</div>
       <div class="original-text">${data.originalText}</div>
       
-      <div class="section-title">Summary</div>
-      <textarea class="summary-input" id="summaryText" placeholder="AI-generated summary...">${data.summary}</textarea>
+      <div class="section-title">LinkedIn Post</div>
+      <textarea class="summary-input" id="summaryText" placeholder="AI-generated LinkedIn post...">${data.linkedinPost || data.summary || ''}</textarea>
       
       <div class="section-title">Category</div>
       <div class="category-section">
@@ -58,9 +58,9 @@ function showReviewInterface(data) {
       </div>
     </div>
     
-    <div class="actions">
-      <button class="btn btn-secondary" id="discardBtn">Discard</button>
-      <button class="btn btn-primary" id="saveBtn">Save to Newsletter</button>
+    <div class="action-buttons">
+      <button class="btn-secondary" id="discardBtn">Discard</button>
+      <button class="btn-primary" id="saveBtn">Save to Notion</button>
     </div>
   `;
   
@@ -109,7 +109,8 @@ function setupEventListeners(data) {
   saveBtn.addEventListener('click', async () => {
     await saveContent({
       ...data,
-      summary: summaryText.value,
+      linkedinPost: summaryText.value,  // Changed from summary to linkedinPost
+      summary: summaryText.value,  // Keep for backward compatibility
       category: categorySelect.value
     });
   });
