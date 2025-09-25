@@ -20,6 +20,25 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+// Create context menu item
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({
+    id: 'capture-for-linkedin',
+    title: 'Generate LinkedIn Post',
+    contexts: ['selection']
+  });
+});
+
+// Handle context menu clicks
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === 'capture-for-linkedin' && info.selectionText) {
+    // Send message to content script
+    chrome.tabs.sendMessage(tab.id, {
+      action: 'captureContent'
+    });
+  }
+});
+
 // Handle keyboard shortcut
 chrome.commands.onCommand.addListener((command) => {
   if (command === 'capture-content') {
