@@ -79,11 +79,21 @@ async function saveSettings() {
     const notionKey = document.getElementById('notionApiKey').value;
     const notionDbId = document.getElementById('notionDatabaseId').value;
     
+    console.log('Attempting to save settings...');
+    console.log('OpenAI Key present:', openaiKey ? 'Yes' : 'No');
+    console.log('Has placeholder dots:', openaiKey && openaiKey.includes('•') ? 'Yes' : 'No');
+    
     if (openaiKey && !openaiKey.includes('•')) {
       settings.openaiApiKey = openaiKey;
+      console.log('OpenAI API key will be saved');
+    } else if (openaiKey && openaiKey.includes('•')) {
+      console.log('OpenAI API key NOT saved - contains placeholder dots');
+    } else {
+      console.log('OpenAI API key NOT saved - field is empty');
     }
     
     settings.openaiModel = openaiModel; // Always save the selected model
+    console.log('Model selected:', openaiModel);
     
     if (notionKey && !notionKey.includes('•')) {
       settings.notionApiKey = notionKey;
@@ -273,3 +283,37 @@ function showStatusMessage(message, type) {
     statusDiv.className = '';
   }, 5000);
 }
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', () => {
+  loadSettings();
+  
+  // Add save button listener
+  document.getElementById('saveBtn').addEventListener('click', saveSettings);
+  
+  // Add debug button listener
+  const debugBtn = document.getElementById('debugBtn');
+  if (debugBtn) {
+    debugBtn.addEventListener('click', async () => {
+      const stored = await chrome.storage.sync.get(null);
+      const output = document.getElementById('debugOutput');
+      
+      // Mask sensitive values for display
+      const displayData = { ...stored };
+      if (displayData.openaiApiKey) {
+        displayData.openaiApiKey = displayData.openaiApiKey.substring(0, 10) + '...' + 
+                                    displayData.openaiApiKey.substring(displayData.openaiApiKey.length - 4);
+      }
+      if (displayData.notionApiKey) {
+        displayData.notionApiKey = displayData.notionApiKey.substring(0, 10) + '...' + 
+                                    displayData.notionApiKey.substring(displayData.notionApiKey.length - 4);
+      }
+      
+      output.textContent = JSON.stringify(displayData, null, 2);
+      output.style.display = 'block';
+    });
+  }
+  
+  // Add category form listener
+  // ... existing code ...
+});
