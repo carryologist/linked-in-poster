@@ -124,7 +124,7 @@ async function processContentWithAI(contentData) {
     const { categories } = await chrome.storage.sync.get(['categories']);
     
     const prompt = `
-You are helping the CEO of Coder, a software startup that makes AI development infrastructure. Your job is to transform the selected text into an engaging LinkedIn post that builds awareness for Coder and establishes thought leadership.
+You are helping the CEO of Coder, a software startup that makes AI development infrastructure. Your job is to transform the selected text into an engaging LinkedIn post written in first person for the user that builds awareness for Coder and establishes thought leadership.
 
 Content to transform: "${contentData.selectedText}"
 Source URL: ${contentData.sourceUrl}
@@ -143,7 +143,7 @@ Create a LinkedIn post following these guidelines:
    
    The opening must be punchy, specific, and immediately valuable - not generic.
 
-2. Write in a conversational tone that's engaging and approachable
+2. Write in a conversational tone that's engaging and approachable. Make sure to use first person from the point of view of the user.
 
 3. Keep the post between 1,000-2,000 characters (aim for the sweet spot around 1,500)
 
