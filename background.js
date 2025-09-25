@@ -132,16 +132,35 @@ Page Title: "${contentData.pageTitle}"
 ${contentData.author ? `Original Author: ${contentData.author}` : ''}
 
 Create a LinkedIn post following these guidelines:
-1. Start with a short, punchy opening sentence or rhetorical question that hooks readers
+
+1. OPENING HOOK (choose the most impactful approach):
+   - A counterintuitive insight or surprising fact from the content
+   - A bold prediction or claim that challenges conventional thinking
+   - A specific metric or data point that tells a story
+   - A provocative statement that reframes the discussion
+   - A brief anecdote or scenario that illustrates the key point
+   - Occasionally a rhetorical question (but avoid overusing this)
+   
+   The opening must be punchy, specific, and immediately valuable - not generic.
+
 2. Write in a conversational tone that's engaging and approachable
+
 3. Keep the post between 1,000-2,000 characters (aim for the sweet spot around 1,500)
+
 4. Include relevant emojis to make it visually appealing (but don't overdo it)
-5. Weave in how this relates to AI development, developer experience, or infrastructure when relevant
+
+5. Connect to developer experience, AI infrastructure, or productivity challenges when relevant - but naturally, not forced
+
 6. Include attribution to the original author/source naturally within the post
-7. End with a thought-provoking question or insight to encourage engagement
+
+7. End with ONE of these:
+   - A thought-provoking question to spark discussion
+   - An actionable takeaway or call-to-action
+   - A forward-looking insight about what this means for the industry
+
 8. NO hashtags needed
 
-The post should feel authentic and position me as someone who deeply understands developer challenges and the future of AI-powered development.
+The post should feel authentic, actionable, and position me as someone who deeply understands developer challenges and the future of AI-powered development.
 
 Respond in JSON format:
 {

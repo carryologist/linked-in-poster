@@ -58,15 +58,71 @@ function showReviewInterface(data) {
       </div>
     </div>
     
-    <div class="action-buttons">
-      <button class="btn-secondary" id="discardBtn">Discard</button>
-      <button class="btn-primary" id="saveBtn">Save to Notion</button>
+    <div class="action-buttons" style="display: flex; gap: 12px; margin-top: 20px;">
+      <button class="action-btn action-btn-secondary" id="discardBtn" style="
+        flex: 1;
+        padding: 12px 20px;
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+        color: #374151;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      ">Discard</button>
+      <button class="action-btn action-btn-primary" id="saveBtn" style="
+        flex: 1;
+        padding: 12px 20px;
+        border: none;
+        background: #3b82f6;
+        color: white;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      ">Save to Notion</button>
     </div>
   `;
   
   // Load categories and set up event listeners
   loadCategories(data.category);
-  setupEventListeners(data);
+  
+  const saveBtn = document.getElementById('saveBtn');
+  const discardBtn = document.getElementById('discardBtn');
+  const summaryText = document.getElementById('summaryText');
+  const categorySelect = document.getElementById('categorySelect');
+  
+  // Add hover effects
+  saveBtn.addEventListener('mouseenter', () => {
+    saveBtn.style.background = '#2563eb';
+  });
+  saveBtn.addEventListener('mouseleave', () => {
+    saveBtn.style.background = '#3b82f6';
+  });
+  
+  discardBtn.addEventListener('mouseenter', () => {
+    discardBtn.style.background = '#f3f4f6';
+  });
+  discardBtn.addEventListener('mouseleave', () => {
+    discardBtn.style.background = '#ffffff';
+  });
+  
+  saveBtn.addEventListener('click', async () => {
+    await saveContent({
+      ...data,
+      linkedinPost: summaryText.value,  // Changed from summary to linkedinPost
+      summary: summaryText.value,  // Keep for backward compatibility
+      category: categorySelect.value
+    });
+  });
+  
+  discardBtn.addEventListener('click', () => {
+    discardContent();
+  });
 }
 
 async function loadCategories(selectedCategory) {
@@ -98,26 +154,6 @@ async function loadCategories(selectedCategory) {
   } catch (error) {
     console.error('Error loading categories:', error);
   }
-}
-
-function setupEventListeners(data) {
-  const saveBtn = document.getElementById('saveBtn');
-  const discardBtn = document.getElementById('discardBtn');
-  const summaryText = document.getElementById('summaryText');
-  const categorySelect = document.getElementById('categorySelect');
-  
-  saveBtn.addEventListener('click', async () => {
-    await saveContent({
-      ...data,
-      linkedinPost: summaryText.value,  // Changed from summary to linkedinPost
-      summary: summaryText.value,  // Keep for backward compatibility
-      category: categorySelect.value
-    });
-  });
-  
-  discardBtn.addEventListener('click', () => {
-    discardContent();
-  });
 }
 
 async function saveContent(data) {
