@@ -2,34 +2,53 @@
 
 // Handle extension installation
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('Newsletter Generator extension installed');
+  console.log('LinkedIn Post Generator extension installed');
   
-  // Initialize default categories
+  // Initialize or migrate categories
   chrome.storage.sync.get(['categories'], (result) => {
-    if (!result.categories) {
-      const defaultCategories = [
-        '🚀 Developer Productivity',
-        '🤖 AI/ML Engineering',
-        '🏗️ Tech Infrastructure',
-        '💡 Industry Insights',
-        '🛠️ Product Innovation',
-        '🎯 Leadership & Culture',
-        '📊 Tech Strategy',
-        '🔮 Future of Development',
-        '📚 Lessons Learned',
-        '🤝 Community & Open Source'
-      ];
-      chrome.storage.sync.set({ categories: defaultCategories });
+    const oldCategories = [
+      'Employee Milestones',
+      'Customer Wins',
+      'Product Announcements',
+      'Company News',
+      'Industry Updates',
+      'Team Updates'
+    ];
+    
+    const newCategories = [
+      '🚀 Developer Productivity',
+      '🤖 AI/ML Engineering',
+      '🏗️ Tech Infrastructure',
+      '💡 Industry Insights',
+      '🛠️ Product Innovation',
+      '🎯 Leadership & Culture',
+      '📊 Tech Strategy',
+      '🔮 Future of Development',
+      '📚 Lessons Learned',
+      '🤝 Community & Open Source'
+    ];
+    
+    // Check if we have old categories or no categories
+    if (!result.categories || 
+        result.categories.length === 0 || 
+        result.categories.some(cat => oldCategories.includes(cat))) {
+      // Migrate to new categories
+      chrome.storage.sync.set({ categories: newCategories }, () => {
+        console.log('Migrated to LinkedIn-focused categories');
+      });
     }
   });
 });
 
 // Create context menu item
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: 'capture-for-linkedin',
-    title: 'Generate LinkedIn Post',
-    contexts: ['selection']
+  // Remove existing menu items first to avoid duplicates
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: 'capture-for-linkedin',
+      title: 'Generate LinkedIn Post',
+      contexts: ['selection']
+    });
   });
 });
 
