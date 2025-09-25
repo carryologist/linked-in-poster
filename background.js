@@ -201,7 +201,7 @@ async function saveToNotion(summaryData) {
               name: summaryData.category
             }
           },
-          'LinkedIn Post': {
+          'Summary': {
             rich_text: [{
               text: {
                 content: summaryData.linkedinPost || summaryData.summary
