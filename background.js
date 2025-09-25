@@ -52,11 +52,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Process content with OpenAI API
 async function processContentWithAI(contentData) {
   try {
-    // Get API key from storage
-    const { openaiApiKey } = await chrome.storage.sync.get(['openaiApiKey']);
+    // Load settings from storage
+    const { openaiApiKey, openaiModel } = await chrome.storage.sync.get(['openaiApiKey', 'openaiModel']);
     if (!openaiApiKey) {
       throw new Error('OpenAI API key not configured. Please set it in the extension options.');
     }
+    
+    const selectedModel = openaiModel || 'gpt-4o-mini'; // Default to gpt-4o-mini if not set
     
     // Get current categories
     const { categories } = await chrome.storage.sync.get(['categories']);
@@ -97,13 +99,13 @@ Respond in JSON format:
         'Authorization': `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4',
+        model: selectedModel, // Use the selected model from settings
         messages: [{
           role: 'user',
           content: prompt
         }],
         temperature: 0.3,
-        max_tokens: 300
+        max_tokens: 500  // Increased for LinkedIn posts (was 300 for summaries)
       })
     });
     

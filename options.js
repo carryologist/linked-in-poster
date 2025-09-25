@@ -10,6 +10,7 @@ async function loadSettings() {
     // Load API keys
     const result = await chrome.storage.sync.get([
       'openaiApiKey',
+      'openaiModel',
       'notionApiKey', 
       'notionDatabaseId',
       'categories'
@@ -19,6 +20,10 @@ async function loadSettings() {
     if (result.openaiApiKey) {
       document.getElementById('openaiApiKey').placeholder = '••••••••••••••••';
       updateConnectionStatus('openai', true);
+    }
+    
+    if (result.openaiModel) {
+      document.getElementById('openaiModel').value = result.openaiModel;
     }
     
     if (result.notionApiKey) {
@@ -70,12 +75,15 @@ async function saveSettings() {
     
     // Get API keys (only save if they're not placeholder values)
     const openaiKey = document.getElementById('openaiApiKey').value;
+    const openaiModel = document.getElementById('openaiModel').value;
     const notionKey = document.getElementById('notionApiKey').value;
     const notionDbId = document.getElementById('notionDatabaseId').value;
     
     if (openaiKey && !openaiKey.includes('•')) {
       settings.openaiApiKey = openaiKey;
     }
+    
+    settings.openaiModel = openaiModel; // Always save the selected model
     
     if (notionKey && !notionKey.includes('•')) {
       settings.notionApiKey = notionKey;
