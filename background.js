@@ -243,7 +243,7 @@ async function saveToNotion(summaryData) {
               name: summaryData.category
             }
           },
-          'Summary': {
+          'LinkedIn Post': {  // Changed from 'Summary' to 'LinkedIn Post'
             rich_text: [{
               text: {
                 content: summaryData.linkedinPost || summaryData.summary
@@ -255,9 +255,19 @@ async function saveToNotion(summaryData) {
           },
           'Date Added': {
             date: {
-              start: summaryData.timestamp.split('T')[0]
+              start: new Date().toISOString()
             }
-          }
+          },
+          // Add Contributor if we have author information
+          ...(summaryData.author ? {
+            'Contributor': {
+              rich_text: [{
+                text: {
+                  content: summaryData.author
+                }
+              }]
+            }
+          } : {})
         }
       })
     });
