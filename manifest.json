@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "LinkedIn Post Generator",
+  "version": "1.0.0",
+  "icons": {
+    "16": "icon.svg",
+    "32": "icon.svg",
+    "48": "icon.svg",
+    "128": "icon.svg"
+  },
+  "description": "AI-powered tool to transform content into engaging LinkedIn posts for thought leadership",
+  
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  
+  "host_permissions": [
+    "https://*/*"
+  ],
+  
+  "background": {
+    "service_worker": "background.js"
+  },
+  
+  "content_scripts": [{
+    "matches": ["<all_urls>"],
+    "js": ["content.js"]
+  }],
+  
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LinkedIn Post Generator"
+  },
+  
+  "options_page": "options.html",
+  
+  "commands": {
+    "capture-content": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+L",
+        "mac": "MacCtrl+Shift+L"
+      },
+      "description": "Capture selected content for LinkedIn post"
+    }
+  }
+}
