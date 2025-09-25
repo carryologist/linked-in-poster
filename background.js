@@ -58,7 +58,7 @@ async function processContentWithAI(contentData) {
       throw new Error('OpenAI API key not configured. Please set it in the extension options.');
     }
     
-    const selectedModel = openaiModel || 'gpt-5-mini'; // Default to gpt-5-mini - latest OpenAI model
+    const selectedModel = openaiModel || 'gpt-4o-mini'; // Default to gpt-4o-mini - actual OpenAI API model
     
     // Get current categories
     const { categories } = await chrome.storage.sync.get(['categories']);
