@@ -6,6 +6,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   statusEl.textContent = 'Processing';
   statusEl.className = 'status processing';
 
+  // Populate model picker
+  initModelPicker().catch(console.error);
+
   // Get the current tab
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   
@@ -43,6 +46,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   showEmptyState();
 });
 
+async function initModelPicker() {
+  const select = document.getElementById('popupModelSelect');
+  if (!select) return;
+  const { openaiModel } = await chrome.storage.sync.get(['openaiModel']);
+  const current = openaiModel || 'gpt-4.1';
+  // Set current value if present among options
+  const option = Array.from(select.options).find(o => o.value === current);
+  if (option) select.value = current;
+  select.addEventListener('change', async () => {
+    await chrome.storage.sync.set({ openaiModel: select.value });
+  });
+}
+
 async function loadContent() {
   const contentDiv = document.getElementById('content');
   
@@ -68,7 +84,7 @@ function showEmptyState() {
       <div class="empty-state-icon">📝</div>
       <div class="empty-state-title">No content captured</div>
       <div class="empty-state-text">
-        Select text on any webpage and press <strong>Ctrl+Shift+N</strong> to capture content for your newsletter.
+        Select text on any webpage and press <strong>Ctrl+Shift+L</strong> to capture content for your newsletter.
       </div>
     </div>
   `;
