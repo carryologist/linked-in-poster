@@ -71,6 +71,57 @@ async function callOpenAI(apiBody, apiKey) {
   return await response.json();
 }
 
+// Fallback: Responses API (supports reasoning and max_output_tokens)
+async function callOpenAIResponses({ model, input, maxOutputTokens }, apiKey) {
+  const body = {
+    model,
+    input,
+    response_format: { type: 'json_object' },
+    reasoning: { effort: 'low' },
+    max_output_tokens: maxOutputTokens
+  };
+  console.log('Responses API request body:', JSON.stringify(body));
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) {
+    const errTxt = await response.text();
+    console.error('OpenAI Responses API error response:', errTxt);
+    throw new Error(`OpenAI Responses API error: ${response.status} - ${errTxt}`);
+  }
+  return await response.json();
+}
+
+function extractTextFromResponsesAPI(data) {
+  if (!data) return '';
+  // New Responses API typically returns an `output` array with parts containing text
+  if (Array.isArray(data.output)) {
+    const texts = data.output
+      .filter(part => part && (part.type === 'output_text' || part.type === 'message'))
+      .map(part => {
+        if (part.type === 'output_text' && typeof part.text === 'string') return part.text;
+        if (part.type === 'message' && part.content && Array.isArray(part.content)) {
+          return part.content.map(c => (typeof c.text === 'string' ? c.text : (c.text && c.text.value) || '')).join('');
+        }
+        return '';
+      })
+      .filter(Boolean);
+    return texts.join('\n');
+  }
+  // Some variants include `content` with array of blocks
+  if (Array.isArray(data.content)) {
+    const texts = data.content.map(c => (c.text && c.text.value) || c.text || '').filter(Boolean);
+    return texts.join('\n');
+  }
+  // Fallback: try common top-level fields
+  return data.output_text || data.text || '';
+}
+
 // Handle extension installation
 chrome.runtime.onInstalled.addListener(() => {
   console.log('LinkedIn Post Generator extension installed');
@@ -284,9 +335,10 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
     while (attempt <= 2) {
       const apiBody = { ...baseApiBody };
       if (isGPT5Model) {
-        apiBody.max_completion_tokens = attempt === 1 ? 1000 : 2000; // allow more budget on retry
+        // Use max_tokens on Chat Completions
+        apiBody.max_tokens = attempt === 1 ? 1000 : 2000;
         apiBody.response_format = { type: 'json_object' };
-        console.log(`Using max_completion_tokens=${apiBody.max_completion_tokens} for GPT-5 model with JSON response format (attempt ${attempt})`);
+        console.log(`Using max_tokens=${apiBody.max_tokens} for GPT-5 model with JSON response format (attempt ${attempt})`);
       } else {
         apiBody.max_tokens = attempt === 1 ? 1000 : 2000;
         apiBody.temperature = attempt === 1 ? 0.3 : 0.2;
@@ -313,6 +365,21 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
 
       // Otherwise exit loop
       break;
+    }
+
+    // If still empty after chat retries and we're using GPT-5, try the Responses API as a last resort
+    if ((!messageContent || !messageContent.trim()) && isGPT5Model) {
+      try {
+        const resp = await callOpenAIResponses({
+          model: selectedModel,
+          input: prompt,
+          maxOutputTokens: 1500
+        }, openaiApiKey);
+        messageContent = extractTextFromResponsesAPI(resp) || '';
+        console.log('Responses API text to parse:', messageContent);
+      } catch (e) {
+        console.error('Responses API fallback failed:', e);
+      }
     }
 
     let aiResult;
