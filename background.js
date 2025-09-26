@@ -162,54 +162,29 @@ async function processContentWithAI(contentData) {
     const { categories } = await chrome.storage.sync.get(['categories']);
     
     const prompt = `
-You are helping the CEO of Coder, a software startup that makes AI development infrastructure. Your job is to transform the selected text into an engaging LinkedIn post written in first person for the user that builds awareness for Coder and establishes thought leadership.
+You are helping the CEO of Coder, a software startup that makes AI development infrastructure. Transform the selected text into an engaging LinkedIn post.
 
 Content to transform: "${contentData.selectedText}"
 Source URL: ${contentData.sourceUrl}
 Page Title: "${contentData.pageTitle}"
 ${contentData.author ? `Original Author: ${contentData.author}` : ''}
 
-Create a LinkedIn post following these guidelines:
-
-1. OPENING HOOK (choose the most impactful approach):
-   - A counterintuitive insight or surprising fact from the content
-   - A bold prediction or claim that challenges conventional thinking
-   - A specific metric or data point that tells a story
-   - A provocative statement that reframes the discussion
-   - A brief anecdote or scenario that illustrates the key point
-   - Occasionally a rhetorical question (but avoid overusing this)
-   
-   The opening must be punchy, specific, and immediately valuable - not generic.
-
-2. Write in a conversational tone that's engaging and approachable. Make sure to use first person from the point of view of the user.
-
-3. Keep the post between 1,000-2,000 characters (aim for the sweet spot around 1,500)
-
-4. Include relevant emojis to make it visually appealing (but don't overdo it)
-
-5. Connect to developer experience, AI infrastructure, or productivity challenges when relevant - but naturally, not forced
-
-6. Include attribution to the original author/source naturally within the post
-
-7. End with ONE of these:
-   - A thought-provoking question to spark discussion
-   - An actionable takeaway or call-to-action
-   - A forward-looking insight about what this means for the industry
-
-8. NO hashtags needed
-
-The post should feel authentic, actionable, and position me as someone who deeply understands developer challenges and the future of AI-powered development.
-
-Respond in JSON format:
+IMPORTANT: You MUST respond with a valid JSON object in this exact format:
 {
-  "linkedinPost": "[The complete LinkedIn post with emojis]",
-  "characterCount": [number of characters],
-  "category": "[Choose ONLY ONE best-fit category from: ${categories.join(', ')}]",
+  "linkedinPost": "[Your LinkedIn post here with emojis]",
+  "characterCount": [number],
+  "category": "[Choose ONE from: ${categories.join(', ')}]",
   "isNewCategory": false
 }
 
-IMPORTANT: Select only ONE category that best fits the content. Do not provide multiple categories.
-`;
+Guidelines for the LinkedIn post:
+1. Start with a hook - insight, bold claim, metric, or provocative statement
+2. Conversational tone, 1000-2000 characters
+3. Include relevant emojis
+4. Include attribution to source
+5. End with question or actionable takeaway
+
+Generate the LinkedIn post now and return ONLY the JSON object above.`;
     
     console.log('Using model:', selectedModel); // Debug logging
     
