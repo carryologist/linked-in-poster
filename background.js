@@ -124,6 +124,38 @@ function extractTextFromResponsesAPI(data) {
   return data.output_text || data.text || '';
 }
 
+// Gemini caller (Google AI Studio)
+async function callGemini({ model, prompt, maxOutputTokens, googleApiKey }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000);
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(googleApiKey)}`;
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.3,
+      maxOutputTokens: maxOutputTokens || 1200,
+      responseMimeType: 'application/json'
+    },
+    systemInstruction: { parts: [{ text: 'Return ONLY the JSON object described. No extra text.' }] }
+  };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: controller.signal
+  }).finally(() => clearTimeout(timeout));
+  if (!res.ok) {
+    const txt = await res.text();
+    console.error('Gemini API error:', txt);
+    throw new Error(`Gemini API error: ${res.status} - ${txt}`);
+  }
+  const data = await res.json();
+  const text = (data && data.candidates && data.candidates[0] && data.candidates[0].content && Array.isArray(data.candidates[0].content.parts))
+    ? data.candidates[0].content.parts.map(p => p?.text || '').join('')
+    : '';
+  return text || '';
+}
+
 // Handle extension installation
 chrome.runtime.onInstalled.addListener(() => {
   console.log('LinkedIn Post Generator extension installed');
@@ -274,9 +306,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 async function processContentWithAI(contentData) {
   try {
     // Load settings from storage
-    const { openaiApiKey, openaiModel } = await chrome.storage.sync.get(['openaiApiKey', 'openaiModel']);
-    if (!openaiApiKey) {
+    const { openaiApiKey, openaiModel, googleApiKey } = await chrome.storage.sync.get(['openaiApiKey', 'openaiModel', 'googleApiKey']);
+    if (!openaiApiKey && !(openaiModel || '').startsWith('gemini')) {
       throw new Error('OpenAI API key not configured. Please set it in the extension options.');
+    }
+    if ((openaiModel || '').startsWith('gemini') && !googleApiKey) {
+      throw new Error('Gemini API key not configured. Please set it in the extension options.');
     }
     
     // Available models as of 2025:
@@ -286,20 +321,21 @@ async function processContentWithAI(contentData) {
     // - gpt-4.1 (previous generation, still very capable)
     // - gpt-4o (older multimodal model)
     // - gpt-4o-mini (older cost-efficient model)
-    const selectedModel = openaiModel || 'gpt-5-mini'; // Default to gpt-5-mini for balance of quality and cost
+    const selectedModel = openaiModel || 'gpt-4.1';
     
     // Determine GPT-5 early for dynamic truncation
     const isGPT5Model = selectedModel && (
       selectedModel.toLowerCase().includes('gpt-5') || 
       selectedModel.toLowerCase().includes('gpt5')
     );
+    const isGeminiModel = selectedModel && selectedModel.toLowerCase().startsWith('gemini');
 
     // Get current categories
     const { categories } = await chrome.storage.sync.get(['categories']);
     const availableCategories = Array.isArray(categories) && categories.length ? categories : LINKEDIN_CATEGORIES;
 
-    // Dynamic truncation: reduce size for GPT-5 models to avoid hidden reasoning exhaustion
-    const maxInputChars = isGPT5Model ? 3500 : 8000;
+    // Dynamic truncation
+    const maxInputChars = isGPT5Model || isGeminiModel ? 3500 : 8000;
     const truncatedSelectedText = truncateText(contentData.selectedText, maxInputChars);
     
     const prompt = `
@@ -329,39 +365,30 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
     
     console.log('Using model:', selectedModel); // Debug logging
     
-    // Try Responses API first for GPT-5 models
-    let data = null;
+    // Try Gemini path first if selected
     let messageContent = '';
-    if (isGPT5Model) {
+    if (isGeminiModel) {
       try {
-        const resp = await callOpenAIResponses({
-          model: selectedModel,
-          input: prompt,
-          maxOutputTokens: 1200
-        }, openaiApiKey);
-        messageContent = extractTextFromResponsesAPI(resp) || '';
-        console.log('Responses API text to parse:', messageContent);
+        messageContent = await callGemini({ model: selectedModel, prompt, maxOutputTokens: 1200, googleApiKey });
+        console.log('Gemini text to parse:', messageContent);
       } catch (e) {
-        console.warn('Responses API primary attempt failed, falling back to Chat Completions:', e);
+        console.warn('Gemini call failed, will try OpenAI fallback:', e);
       }
     }
 
-    // If we still have no content, proceed with Chat Completions attempts
+    // If Gemini not used or empty, proceed with existing OpenAI paths (GPT-5/4.x)
+    let data = null;
     const baseApiBody = {
       model: selectedModel,
-      messages: [{
-        role: 'user',
-        content: prompt
-      }]
+      messages: [{ role: 'user', content: prompt }]
     };
 
     let attempt = 1;
     let finishReason = '';
 
-    while ((!messageContent || !messageContent.trim()) && attempt <= 2) {
+    while ((!messageContent || !messageContent.trim()) && attempt <= 2 && !isGeminiModel) {
       const apiBody = { ...baseApiBody };
       if (isGPT5Model) {
-        // GPT-5 Chat Completions expect max_completion_tokens
         apiBody.max_completion_tokens = attempt === 1 ? 800 : 1600;
         apiBody.response_format = { type: 'json_object' };
         console.log(`Using max_completion_tokens=${apiBody.max_completion_tokens} for GPT-5 model with JSON response format (attempt ${attempt})`);
@@ -370,26 +397,19 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
         apiBody.temperature = attempt === 1 ? 0.3 : 0.2;
         console.log(`Using max_tokens=${apiBody.max_tokens} for non-GPT-5 model (attempt ${attempt})`);
       }
-
       console.log('API request body:', JSON.stringify(apiBody));
       data = await callOpenAI(apiBody, openaiApiKey);
       console.log('OpenAI API response:', JSON.stringify(data));
-
-      messageContent = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
-      finishReason = (data && data.choices && data.choices[0] && data.choices[0].finish_reason) || '';
+      messageContent = (data?.choices?.[0]?.message?.content) || '';
+      finishReason = (data?.choices?.[0]?.finish_reason) || '';
       console.log('Message content to parse:', messageContent);
-
       if (messageContent && finishReason === 'stop') break;
-      if ((!messageContent || finishReason === 'length') && attempt === 1) {
-        console.warn('Empty or truncated response, retrying with larger token budget...');
-        attempt++;
-        continue;
-      }
+      if ((!messageContent || finishReason === 'length') && attempt === 1) { attempt++; continue; }
       break;
     }
 
-    // Final safety net: fall back to gpt-4.1 if GPT-5 paths returned empty
-    if ((!messageContent || !messageContent.trim()) && isGPT5Model) {
+    // Final safety net: fall back to gpt-4.1 if still empty
+    if ((!messageContent || !messageContent.trim()) && (isGPT5Model || isGeminiModel)) {
       const fallbackModel = 'gpt-4.1';
       console.warn('Falling back to model:', fallbackModel);
       try {
@@ -404,41 +424,22 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
           response_format: { type: 'json_object' }
         };
         const fbData = await callOpenAI(fbBody, openaiApiKey);
-        messageContent = (fbData && fbData.choices && fbData.choices[0] && fbData.choices[0].message && fbData.choices[0].message.content) || '';
+        messageContent = (fbData?.choices?.[0]?.message?.content) || '';
         console.log('Fallback gpt-4.1 content to parse:', messageContent);
       } catch (err1) {
-        console.warn('Fallback gpt-4.1 with response_format failed, retrying without it:', err1);
-        try {
-          const fbBody2 = {
-            model: fallbackModel,
-            messages: [
-              { role: 'system', content: 'You output only a valid JSON object. No code fences. No extra text.' },
-              { role: 'user', content: prompt }
-            ],
-            max_tokens: 900,
-            temperature: 0.2
-          };
-          const fbData2 = await callOpenAI(fbBody2, openaiApiKey);
-          messageContent = (fbData2 && fbData2.choices && fbData2.choices[0] && fbData2.choices[0].message && fbData2.choices[0].message.content) || '';
-          console.log('Fallback gpt-4.1 (no JSON mode) content to parse:', messageContent);
-        } catch (err2) {
-          console.error('Fallback gpt-4.1 failed completely:', err2);
-        }
+        console.error('Fallback gpt-4.1 failed:', err1);
       }
     }
 
     let aiResult;
     try {
-      // First try direct JSON.parse
       aiResult = messageContent ? JSON.parse(messageContent) : null;
     } catch (parseError) {
       console.error('Failed to parse AI response as JSON:', parseError);
       console.error('Raw content:', messageContent);
-      // Try to extract the first JSON object if any extra text surrounds it
       aiResult = extractFirstJsonObject(messageContent);
     }
 
-    // As a final fallback, synthesize a structured result if parsing failed or content is empty
     if (!aiResult) {
       const rawContent = messageContent || '';
       if (!rawContent) {
@@ -453,27 +454,25 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
       };
       console.log('Using fallback structure for non-JSON response');
     }
-    
-    // Ensure we only have one category (in case AI returns multiple)
+
     if (aiResult.category && typeof aiResult.category === 'string' && aiResult.category.includes(',')) {
       aiResult.category = aiResult.category.split(',')[0].trim();
     }
-    
-    // Ensure we have the LinkedIn post content in the expected field
+
     if (!aiResult.linkedinPost && aiResult.summary) {
       aiResult.linkedinPost = aiResult.summary;
     }
-    
+
     const finalResult = {
       ...aiResult,
       originalText: contentData.selectedText,
       sourceUrl: contentData.sourceUrl,
       timestamp: new Date().toISOString()
     };
-    
+
     console.log('Final result to return:', finalResult);
     return finalResult;
-    
+
   } catch (error) {
     console.error('Error processing content:', error);
     throw error;

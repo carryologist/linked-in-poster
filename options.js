@@ -13,13 +13,19 @@ async function loadSettings() {
       'openaiModel',
       'notionApiKey', 
       'notionDatabaseId',
-      'categories'
+      'categories',
+      'googleApiKey'
     ]);
     
     // Populate form fields (but don't show actual API keys for security)
     if (result.openaiApiKey) {
       document.getElementById('openaiApiKey').placeholder = '••••••••••••••••';
       updateConnectionStatus('openai', true);
+    }
+    if (result.googleApiKey) {
+      const el = document.getElementById('googleApiKey');
+      if (el) el.placeholder = '••••••••••••••••';
+      updateConnectionStatus('gemini', true);
     }
     
     if (result.openaiModel) {
@@ -75,6 +81,7 @@ async function saveSettings() {
     
     // Get API keys (only save if they're not placeholder values)
     const openaiKey = document.getElementById('openaiApiKey').value;
+    const googleKey = document.getElementById('googleApiKey') ? document.getElementById('googleApiKey').value : '';
     const openaiModel = document.getElementById('openaiModel').value;
     const notionKey = document.getElementById('notionApiKey').value;
     const notionDbId = document.getElementById('notionDatabaseId').value;
@@ -90,6 +97,10 @@ async function saveSettings() {
       console.log('OpenAI API key NOT saved - contains placeholder dots');
     } else {
       console.log('OpenAI API key NOT saved - field is empty');
+    }
+    if (googleKey && !googleKey.includes('•')) {
+      settings.googleApiKey = googleKey;
+      console.log('Gemini API key will be saved');
     }
     
     settings.openaiModel = openaiModel; // Always save the selected model
@@ -114,6 +125,14 @@ async function saveSettings() {
       document.getElementById('openaiApiKey').placeholder = '••••••••••••••••';
       document.getElementById('openaiApiKey').value = '';
     }
+    if (settings.googleApiKey) {
+      const el = document.getElementById('googleApiKey');
+      if (el) {
+        updateConnectionStatus('gemini', true);
+        el.placeholder = '••••••••••••••••';
+        el.value = '';
+      }
+    }
     
     if (settings.notionApiKey) {
       updateConnectionStatus('notion', settings.notionDatabaseId ? true : false);
@@ -137,10 +156,10 @@ async function testConnections() {
     testBtn.disabled = true;
     testBtn.textContent = 'Testing...';
     
-    const result = await chrome.storage.sync.get(['openaiApiKey', 'notionApiKey', 'notionDatabaseId']);
+    const result = await chrome.storage.sync.get(['openaiApiKey', 'googleApiKey', 'openaiModel', 'notionApiKey', 'notionDatabaseId']);
     
     // Test OpenAI connection
-    if (result.openaiApiKey) {
+    if (result.openaiApiKey && !(result.openaiModel || '').startsWith('gemini')) {
       try {
         const response = await fetch('https://api.openai.com/v1/models', {
           headers: {
@@ -155,6 +174,24 @@ async function testConnections() {
         }
       } catch (error) {
         updateConnectionStatus('openai', false);
+      }
+    }
+
+    // Test Gemini connection when a gemini model is selected
+    if ((result.openaiModel || '').startsWith('gemini')) {
+      if (result.googleApiKey) {
+        try {
+          const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(result.googleApiKey)}`);
+          if (r.ok) {
+            updateConnectionStatus('gemini', true);
+          } else {
+            updateConnectionStatus('gemini', false);
+          }
+        } catch (e) {
+          updateConnectionStatus('gemini', false);
+        }
+      } else {
+        updateConnectionStatus('gemini', false);
       }
     }
     
@@ -346,6 +383,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (displayData.openaiApiKey) {
         displayData.openaiApiKey = displayData.openaiApiKey.substring(0, 10) + '...' + 
                                     displayData.openaiApiKey.substring(displayData.openaiApiKey.length - 4);
+      }
+      if (displayData.googleApiKey) {
+        displayData.googleApiKey = displayData.googleApiKey.substring(0, 5) + '...' + 
+                                    displayData.googleApiKey.substring(displayData.googleApiKey.length - 4);
       }
       if (displayData.notionApiKey) {
         displayData.notionApiKey = displayData.notionApiKey.substring(0, 10) + '...' + 
