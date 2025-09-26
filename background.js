@@ -55,14 +55,17 @@ function extractFirstJsonObject(str) {
 
 // Helper to call OpenAI Chat Completions API
 async function callOpenAI(apiBody, apiKey) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000); // 45s timeout
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`
     },
-    body: JSON.stringify(apiBody)
-  });
+    body: JSON.stringify(apiBody),
+    signal: controller.signal
+  }).finally(() => clearTimeout(timeout));
   if (!response.ok) {
     const errorData = await response.text();
     console.error('OpenAI API error response:', errorData);
@@ -197,6 +200,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       lastProcessedResult = result;
       console.log('Stored result for popup:', lastProcessedResult);
       
+      // Persist to storage so popup can load it reliably
+      try {
+        await chrome.storage.local.set({ pendingContent: result });
+      } catch (e) {
+        console.warn('Failed to persist pendingContent:', e);
+      }
+
       // Open the popup
       chrome.action.openPopup();
       
@@ -246,6 +256,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     processContentWithAI(request.data)
       .then(result => {
         lastProcessedResult = result; // Store for popup
+        // Also persist to storage for resilience across worker restarts
+        chrome.storage.local.set({ pendingContent: result }).catch(() => {});
         sendResponse({ success: true, data: result });
       })
       .catch(error => sendResponse({ success: false, error: error.message }));

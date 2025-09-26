@@ -2,23 +2,45 @@
 
 // Initialize popup with data
 document.addEventListener('DOMContentLoaded', async () => {
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = 'Processing';
+  statusEl.className = 'status processing';
+
   // Get the current tab
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   
-  // Check if we have a stored result for this tab
+  // Try background-stored result first
   const result = await chrome.runtime.sendMessage({ 
     action: 'getStoredResult',
-    tabId: tab.id 
+    tabId: tab?.id 
   });
   
   console.log('Popup received data:', result); // Debug logging
   
   if (result && result.data) {
+    statusEl.textContent = 'Ready';
+    statusEl.className = 'status ready';
     showReviewInterface(result.data);
-  } else {
-    // No stored data - show message to select text
-    showEmptyState();
+    return;
   }
+
+  // Fallback: read pendingContent from local storage (set by content script)
+  try {
+    const local = await chrome.storage.local.get(['pendingContent']);
+    if (local && local.pendingContent) {
+      statusEl.textContent = 'Ready';
+      statusEl.className = 'status ready';
+      showReviewInterface(local.pendingContent);
+      return;
+    }
+  } catch (e) {
+    console.error('Error reading pendingContent from storage:', e);
+  }
+
+  // Nothing to show
+  statusEl.textContent = 'Ready';
+  statusEl.className = 'status ready';
+  showEmptyState();
 });
 
 async function loadContent() {
