@@ -189,13 +189,16 @@ IMPORTANT: Select only ONE category that best fits the content. Do not provide m
         'Authorization': `Bearer ${openaiApiKey}`
       },
       body: JSON.stringify({
-        model: selectedModel, // Use the selected model from settings
+        model: selectedModel,
         messages: [{
           role: 'user',
           content: prompt
         }],
         temperature: 0.3,
-        max_tokens: 500  // Increased for LinkedIn posts (was 300 for summaries)
+        // Use max_completion_tokens for GPT-5 models, max_tokens for others
+        ...(selectedModel.startsWith('gpt-5') ? 
+          { max_completion_tokens: 500 } : 
+          { max_tokens: 500 })
       })
     });
     
