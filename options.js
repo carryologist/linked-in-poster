@@ -291,9 +291,27 @@ document.addEventListener('DOMContentLoaded', () => {
   // Add save button listener
   document.getElementById('saveBtn').addEventListener('click', saveSettings);
   
-  // Add reset categories button listener
+  // Add hover effects for Add Category button
+  const addCategoryBtn = document.getElementById('addCategoryBtn');
+  if (addCategoryBtn) {
+    addCategoryBtn.addEventListener('mouseenter', () => {
+      addCategoryBtn.style.background = '#2563eb';
+    });
+    addCategoryBtn.addEventListener('mouseleave', () => {
+      addCategoryBtn.style.background = '#3b82f6';
+    });
+  }
+  
+  // Add hover effects for Reset Categories button
   const resetBtn = document.getElementById('resetCategoriesBtn');
   if (resetBtn) {
+    resetBtn.addEventListener('mouseenter', () => {
+      resetBtn.style.background = '#dc2626';
+    });
+    resetBtn.addEventListener('mouseleave', () => {
+      resetBtn.style.background = '#ef4444';
+    });
+    
     resetBtn.addEventListener('click', async () => {
       if (confirm('This will replace all your current categories with the default LinkedIn categories. Continue?')) {
         const defaultCategories = [
