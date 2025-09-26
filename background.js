@@ -225,7 +225,30 @@ IMPORTANT: Select only ONE category that best fits the content. Do not provide m
     }
     
     const data = await response.json();
-    let aiResult = JSON.parse(data.choices[0].message.content);
+    console.log('OpenAI API response:', JSON.stringify(data)); // Debug the raw response
+    
+    let aiResult;
+    try {
+      const messageContent = data.choices[0].message.content;
+      console.log('Message content to parse:', messageContent); // Debug what we're trying to parse
+      
+      aiResult = JSON.parse(messageContent);
+    } catch (parseError) {
+      console.error('Failed to parse AI response as JSON:', parseError);
+      console.error('Raw content:', data.choices[0].message.content);
+      
+      // Fallback: If GPT-5 isn't returning JSON, create a structured response
+      // This might happen with temperature=1 making the output less structured
+      const rawContent = data.choices[0].message.content;
+      aiResult = {
+        linkedinPost: rawContent,
+        summary: rawContent,
+        category: categories[0] || '🚀 Developer Productivity',
+        isNewCategory: false,
+        characterCount: rawContent.length
+      };
+      console.log('Using fallback structure for non-JSON response');
+    }
     
     // Ensure we only have one category (in case AI returns multiple)
     if (aiResult.category && aiResult.category.includes(',')) {
