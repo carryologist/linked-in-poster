@@ -286,8 +286,6 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
       if (isGPT5Model) {
         apiBody.max_completion_tokens = attempt === 1 ? 1000 : 2000; // allow more budget on retry
         apiBody.response_format = { type: 'json_object' };
-        // Reduce hidden reasoning token burn for GPT-5-like models if supported
-        apiBody.reasoning = { effort: 'low' };
         console.log(`Using max_completion_tokens=${apiBody.max_completion_tokens} for GPT-5 model with JSON response format (attempt ${attempt})`);
       } else {
         apiBody.max_tokens = attempt === 1 ? 1000 : 2000;
