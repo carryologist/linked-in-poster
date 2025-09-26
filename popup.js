@@ -1,7 +1,24 @@
 // Popup script for Newsletter Generator
 
+// Initialize popup with data
 document.addEventListener('DOMContentLoaded', async () => {
-  await loadContent();
+  // Get the current tab
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  
+  // Check if we have a stored result for this tab
+  const result = await chrome.runtime.sendMessage({ 
+    action: 'getStoredResult',
+    tabId: tab.id 
+  });
+  
+  console.log('Popup received data:', result); // Debug logging
+  
+  if (result && result.data) {
+    displayContent(result.data);
+  } else {
+    // No stored data - show message to select text
+    showEmptyState();
+  }
 });
 
 async function loadContent() {

@@ -1,5 +1,8 @@
 // Background service worker for Newsletter Generator
 
+// Store the last processed result
+let lastProcessedResult = null;
+
 // Handle extension installation
 chrome.runtime.onInstalled.addListener(() => {
   console.log('LinkedIn Post Generator extension installed');
@@ -53,23 +56,41 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 // Handle context menu clicks
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === 'capture-for-linkedin' && info.selectionText) {
-    // First try to send message to existing content script
-    chrome.tabs.sendMessage(tab.id, { action: 'captureContent' }, (response) => {
-      if (chrome.runtime.lastError) {
-        // Content script not loaded, inject it
-        chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ['content.js']
-        }, () => {
-          // After injection, send the message
-          setTimeout(() => {
-            chrome.tabs.sendMessage(tab.id, { action: 'captureContent' });
-          }, 100);
-        });
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === 'capture-for-linkedin') {
+    try {
+      // Get selected text
+      const selectedText = info.selectionText;
+      
+      if (!selectedText) {
+        console.error('No text selected');
+        return;
       }
-    });
+      
+      // Process with AI
+      const result = await processContentWithAI({
+        selectedText,
+        sourceUrl: tab.url,
+        pageTitle: tab.title
+      });
+      
+      // Store the result for the popup
+      lastProcessedResult = result;
+      console.log('Stored result for popup:', lastProcessedResult);
+      
+      // Open the popup
+      chrome.action.openPopup();
+      
+    } catch (error) {
+      console.error('Error in context menu handler:', error);
+      // Show error notification
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'icon.svg',
+        title: 'Error',
+        message: error.message
+      });
+    }
   }
 });
 
@@ -99,13 +120,23 @@ chrome.commands.onCommand.addListener((command) => {
   }
 });
 
-// Handle messages from content script
+
+// Message handler for popup and other communications
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'processContent') {
     processContentWithAI(request.data)
-      .then(result => sendResponse({ success: true, data: result }))
+      .then(result => {
+        lastProcessedResult = result; // Store for popup
+        sendResponse({ success: true, data: result });
+      })
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true; // Keep message channel open for async response
+  }
+  
+  if (request.action === 'getStoredResult') {
+    // Return the last processed result to the popup
+    sendResponse({ success: true, data: lastProcessedResult });
+    return false; // Synchronous response
   }
 });
 
@@ -256,12 +287,20 @@ IMPORTANT: Select only ONE category that best fits the content. Do not provide m
       aiResult.category = aiResult.category.split(',')[0].trim();
     }
     
-    return {
+    // Ensure we have the LinkedIn post content in the expected field
+    if (!aiResult.linkedinPost && aiResult.summary) {
+      aiResult.linkedinPost = aiResult.summary;
+    }
+    
+    const finalResult = {
       ...aiResult,
       originalText: contentData.selectedText,
       sourceUrl: contentData.sourceUrl,
       timestamp: new Date().toISOString()
     };
+    
+    console.log('Final result to return:', finalResult);
+    return finalResult;
     
   } catch (error) {
     console.error('Error processing content:', error);
