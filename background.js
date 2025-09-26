@@ -193,17 +193,18 @@ IMPORTANT: Select only ONE category that best fits the content. Do not provide m
       messages: [{
         role: 'user',
         content: prompt
-      }],
-      temperature: 0.3
+      }]
     };
     
-    // Add the appropriate token limit parameter
+    // Add the appropriate parameters based on model type
     if (isGPT5Model) {
       apiBody.max_completion_tokens = 500;
-      console.log('Using max_completion_tokens for GPT-5 model');
+      // GPT-5 models only support default temperature (1), so we don't set it
+      console.log('Using max_completion_tokens for GPT-5 model (no temperature)');
     } else {
       apiBody.max_tokens = 500;
-      console.log('Using max_tokens for non-GPT-5 model');
+      apiBody.temperature = 0.3; // Only set temperature for non-GPT-5 models
+      console.log('Using max_tokens for non-GPT-5 model with temperature 0.3');
     }
     
     console.log('API request body:', JSON.stringify(apiBody)); // Debug logging
