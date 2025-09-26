@@ -118,7 +118,14 @@ async function processContentWithAI(contentData) {
       throw new Error('OpenAI API key not configured. Please set it in the extension options.');
     }
     
-    const selectedModel = openaiModel || 'gpt-4o-mini'; // Default to gpt-4o-mini - actual OpenAI API model
+    // Available models as of 2025:
+    // - gpt-5 (best for coding and complex tasks)
+    // - gpt-5-mini (faster, cost-efficient)
+    // - gpt-5-nano (fastest, most cost-efficient)
+    // - gpt-4.1 (previous generation, still very capable)
+    // - gpt-4o (older multimodal model)
+    // - gpt-4o-mini (older cost-efficient model)
+    const selectedModel = openaiModel || 'gpt-5-mini'; // Default to gpt-5-mini for balance of quality and cost
     
     // Get current categories
     const { categories } = await chrome.storage.sync.get(['categories']);
