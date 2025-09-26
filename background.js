@@ -288,12 +288,19 @@ async function processContentWithAI(contentData) {
     // - gpt-4o-mini (older cost-efficient model)
     const selectedModel = openaiModel || 'gpt-5-mini'; // Default to gpt-5-mini for balance of quality and cost
     
+    // Determine GPT-5 early for dynamic truncation
+    const isGPT5Model = selectedModel && (
+      selectedModel.toLowerCase().includes('gpt-5') || 
+      selectedModel.toLowerCase().includes('gpt5')
+    );
+
     // Get current categories
     const { categories } = await chrome.storage.sync.get(['categories']);
     const availableCategories = Array.isArray(categories) && categories.length ? categories : LINKEDIN_CATEGORIES;
 
-    // Truncate very long selections to avoid token exhaustion
-    const truncatedSelectedText = truncateText(contentData.selectedText, 8000);
+    // Dynamic truncation: reduce size for GPT-5 models to avoid hidden reasoning exhaustion
+    const maxInputChars = isGPT5Model ? 3500 : 8000;
+    const truncatedSelectedText = truncateText(contentData.selectedText, maxInputChars);
     
     const prompt = `
 You are helping the CEO of Coder, a software startup that makes AI development infrastructure. Transform the selected text into an engaging LinkedIn post.
@@ -322,12 +329,6 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
     
     console.log('Using model:', selectedModel); // Debug logging
     
-    // Determine which token parameter to use based on model
-    const isGPT5Model = selectedModel && (
-      selectedModel.toLowerCase().includes('gpt-5') || 
-      selectedModel.toLowerCase().includes('gpt5')
-    );
-    
     // Try Responses API first for GPT-5 models
     let data = null;
     let messageContent = '';
@@ -336,7 +337,7 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
         const resp = await callOpenAIResponses({
           model: selectedModel,
           input: prompt,
-          maxOutputTokens: 1500
+          maxOutputTokens: 1200
         }, openaiApiKey);
         messageContent = extractTextFromResponsesAPI(resp) || '';
         console.log('Responses API text to parse:', messageContent);
@@ -361,7 +362,7 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
       const apiBody = { ...baseApiBody };
       if (isGPT5Model) {
         // GPT-5 Chat Completions expect max_completion_tokens
-        apiBody.max_completion_tokens = attempt === 1 ? 1000 : 2000;
+        apiBody.max_completion_tokens = attempt === 1 ? 800 : 1600;
         apiBody.response_format = { type: 'json_object' };
         console.log(`Using max_completion_tokens=${apiBody.max_completion_tokens} for GPT-5 model with JSON response format (attempt ${attempt})`);
       } else {
@@ -385,6 +386,45 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
         continue;
       }
       break;
+    }
+
+    // Final safety net: fall back to gpt-4.1 if GPT-5 paths returned empty
+    if ((!messageContent || !messageContent.trim()) && isGPT5Model) {
+      const fallbackModel = 'gpt-4.1';
+      console.warn('Falling back to model:', fallbackModel);
+      try {
+        const fbBody = {
+          model: fallbackModel,
+          messages: [
+            { role: 'system', content: 'You output only a valid JSON object. No code fences. No extra text.' },
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: 900,
+          temperature: 0.2,
+          response_format: { type: 'json_object' }
+        };
+        const fbData = await callOpenAI(fbBody, openaiApiKey);
+        messageContent = (fbData && fbData.choices && fbData.choices[0] && fbData.choices[0].message && fbData.choices[0].message.content) || '';
+        console.log('Fallback gpt-4.1 content to parse:', messageContent);
+      } catch (err1) {
+        console.warn('Fallback gpt-4.1 with response_format failed, retrying without it:', err1);
+        try {
+          const fbBody2 = {
+            model: fallbackModel,
+            messages: [
+              { role: 'system', content: 'You output only a valid JSON object. No code fences. No extra text.' },
+              { role: 'user', content: prompt }
+            ],
+            max_tokens: 900,
+            temperature: 0.2
+          };
+          const fbData2 = await callOpenAI(fbBody2, openaiApiKey);
+          messageContent = (fbData2 && fbData2.choices && fbData2.choices[0] && fbData2.choices[0].message && fbData2.choices[0].message.content) || '';
+          console.log('Fallback gpt-4.1 (no JSON mode) content to parse:', messageContent);
+        } catch (err2) {
+          console.error('Fallback gpt-4.1 failed completely:', err2);
+        }
+      }
     }
 
     let aiResult;
