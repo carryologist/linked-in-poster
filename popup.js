@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   console.log('Popup received data:', result); // Debug logging
   
   if (result && result.data) {
-    displayContent(result.data);
+    showReviewInterface(result.data);
   } else {
     // No stored data - show message to select text
     showEmptyState();
