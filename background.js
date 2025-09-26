@@ -182,24 +182,39 @@ IMPORTANT: Select only ONE category that best fits the content. Do not provide m
     
     console.log('Using model:', selectedModel); // Debug logging
     
+    // Determine which token parameter to use based on model
+    const isGPT5Model = selectedModel && (
+      selectedModel.toLowerCase().includes('gpt-5') || 
+      selectedModel.toLowerCase().includes('gpt5')
+    );
+    
+    const apiBody = {
+      model: selectedModel,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }],
+      temperature: 0.3
+    };
+    
+    // Add the appropriate token limit parameter
+    if (isGPT5Model) {
+      apiBody.max_completion_tokens = 500;
+      console.log('Using max_completion_tokens for GPT-5 model');
+    } else {
+      apiBody.max_tokens = 500;
+      console.log('Using max_tokens for non-GPT-5 model');
+    }
+    
+    console.log('API request body:', JSON.stringify(apiBody)); // Debug logging
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${openaiApiKey}`
       },
-      body: JSON.stringify({
-        model: selectedModel,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }],
-        temperature: 0.3,
-        // Use max_completion_tokens for GPT-5 models, max_tokens for others
-        ...(selectedModel.startsWith('gpt-5') ? 
-          { max_completion_tokens: 500 } : 
-          { max_tokens: 500 })
-      })
+      body: JSON.stringify(apiBody)
     });
     
     if (!response.ok) {
