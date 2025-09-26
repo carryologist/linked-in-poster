@@ -335,10 +335,10 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
     while (attempt <= 2) {
       const apiBody = { ...baseApiBody };
       if (isGPT5Model) {
-        // Use max_tokens on Chat Completions
-        apiBody.max_tokens = attempt === 1 ? 1000 : 2000;
+        // GPT-5 Chat Completions expect max_completion_tokens
+        apiBody.max_completion_tokens = attempt === 1 ? 1000 : 2000;
         apiBody.response_format = { type: 'json_object' };
-        console.log(`Using max_tokens=${apiBody.max_tokens} for GPT-5 model with JSON response format (attempt ${attempt})`);
+        console.log(`Using max_completion_tokens=${apiBody.max_completion_tokens} for GPT-5 model with JSON response format (attempt ${attempt})`);
       } else {
         apiBody.max_tokens = attempt === 1 ? 1000 : 2000;
         apiBody.temperature = attempt === 1 ? 0.3 : 0.2;
