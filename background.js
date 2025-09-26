@@ -3,6 +3,74 @@
 // Store the last processed result
 let lastProcessedResult = null;
 
+// Safe default categories for LinkedIn posts
+const LINKEDIN_CATEGORIES = [
+  '🚀 Developer Productivity',
+  '🤖 AI/ML Engineering',
+  '🏗️ Tech Infrastructure',
+  '💡 Industry Insights',
+  '🛠️ Product Innovation',
+  '🎯 Leadership & Culture',
+  '📊 Tech Strategy',
+  '🔮 Future of Development',
+  '📚 Lessons Learned',
+  '🤝 Community & Open Source'
+];
+
+// Helper to truncate very long input to stay within token budgets
+function truncateText(input, maxChars = 8000) {
+  if (!input || input.length <= maxChars) return input || '';
+  const head = Math.floor(maxChars * 0.6);
+  const tail = Math.max(0, maxChars - head - 3);
+  return input.slice(0, head) + '...' + input.slice(input.length - tail);
+}
+
+// Helper to extract the first valid JSON object embedded in a string
+function extractFirstJsonObject(str) {
+  if (!str) return null;
+  const start = str.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  for (let i = start; i < str.length; i++) {
+    const ch = str[i];
+    const prev = i > 0 ? str[i - 1] : '';
+    if (ch === '"' && prev !== '\\') inString = !inString;
+    if (inString) continue;
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        const candidate = str.slice(start, i + 1);
+        try {
+          return JSON.parse(candidate);
+        } catch (e) {
+          // continue scanning in case a later closing brace forms valid JSON
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// Helper to call OpenAI Chat Completions API
+async function callOpenAI(apiBody, apiKey) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(apiBody)
+  });
+  if (!response.ok) {
+    const errorData = await response.text();
+    console.error('OpenAI API error response:', errorData);
+    throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
+  }
+  return await response.json();
+}
+
 // Handle extension installation
 chrome.runtime.onInstalled.addListener(() => {
   console.log('LinkedIn Post Generator extension installed');
@@ -160,11 +228,15 @@ async function processContentWithAI(contentData) {
     
     // Get current categories
     const { categories } = await chrome.storage.sync.get(['categories']);
+    const availableCategories = Array.isArray(categories) && categories.length ? categories : LINKEDIN_CATEGORIES;
+
+    // Truncate very long selections to avoid token exhaustion
+    const truncatedSelectedText = truncateText(contentData.selectedText, 8000);
     
     const prompt = `
 You are helping the CEO of Coder, a software startup that makes AI development infrastructure. Transform the selected text into an engaging LinkedIn post.
 
-Content to transform: "${contentData.selectedText}"
+Content to transform: "${truncatedSelectedText}"
 Source URL: ${contentData.sourceUrl}
 Page Title: "${contentData.pageTitle}"
 ${contentData.author ? `Original Author: ${contentData.author}` : ''}
@@ -173,7 +245,7 @@ IMPORTANT: You MUST respond with a valid JSON object in this exact format:
 {
   "linkedinPost": "[Your LinkedIn post here with emojis]",
   "characterCount": [number],
-  "category": "[Choose ONE from: ${categories.join(', ')}]",
+  "category": "[Choose ONE from: ${availableCategories.join(', ')}]",
   "isNewCategory": false
 }
 
@@ -194,63 +266,78 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
       selectedModel.toLowerCase().includes('gpt5')
     );
     
-    const apiBody = {
+    // Base API body
+    const baseApiBody = {
       model: selectedModel,
       messages: [{
         role: 'user',
         content: prompt
       }]
     };
-    
-    // Add the appropriate parameters based on model type
-    if (isGPT5Model) {
-      apiBody.max_completion_tokens = 500;
-      // GPT-5 models need response_format to output JSON properly
-      apiBody.response_format = { type: "json_object" };
-      console.log('Using max_completion_tokens for GPT-5 model with JSON response format');
-    } else {
-      apiBody.max_tokens = 500;
-      apiBody.temperature = 0.3; // Only set temperature for non-GPT-5 models
-      console.log('Using max_tokens for non-GPT-5 model with temperature 0.3');
+
+    // Build attempt-specific bodies and retry if needed
+    let attempt = 1;
+    let data = null;
+    let messageContent = '';
+    let finishReason = '';
+
+    while (attempt <= 2) {
+      const apiBody = { ...baseApiBody };
+      if (isGPT5Model) {
+        apiBody.max_completion_tokens = attempt === 1 ? 1000 : 2000; // allow more budget on retry
+        apiBody.response_format = { type: 'json_object' };
+        // Reduce hidden reasoning token burn for GPT-5-like models if supported
+        apiBody.reasoning = { effort: 'low' };
+        console.log(`Using max_completion_tokens=${apiBody.max_completion_tokens} for GPT-5 model with JSON response format (attempt ${attempt})`);
+      } else {
+        apiBody.max_tokens = attempt === 1 ? 1000 : 2000;
+        apiBody.temperature = attempt === 1 ? 0.3 : 0.2;
+        console.log(`Using max_tokens=${apiBody.max_tokens} for non-GPT-5 model (attempt ${attempt})`);
+      }
+
+      console.log('API request body:', JSON.stringify(apiBody));
+      data = await callOpenAI(apiBody, openaiApiKey);
+      console.log('OpenAI API response:', JSON.stringify(data));
+
+      messageContent = (data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+      finishReason = (data && data.choices && data.choices[0] && data.choices[0].finish_reason) || '';
+      console.log('Message content to parse:', messageContent);
+
+      // Break early if we have content and model signaled stop
+      if (messageContent && finishReason === 'stop') break;
+
+      // If empty or truncated, retry once with larger budget
+      if ((!messageContent || finishReason === 'length') && attempt === 1) {
+        console.warn('Empty or truncated response, retrying with larger token budget...');
+        attempt++;
+        continue;
+      }
+
+      // Otherwise exit loop
+      break;
     }
-    
-    console.log('API request body:', JSON.stringify(apiBody)); // Debug logging
-    
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiApiKey}`
-      },
-      body: JSON.stringify(apiBody)
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('OpenAI API error response:', errorData);
-      throw new Error(`OpenAI API error: ${response.status} - ${errorData}`);
-    }
-    
-    const data = await response.json();
-    console.log('OpenAI API response:', JSON.stringify(data)); // Debug the raw response
-    
+
     let aiResult;
     try {
-      const messageContent = data.choices[0].message.content;
-      console.log('Message content to parse:', messageContent); // Debug what we're trying to parse
-      
-      aiResult = JSON.parse(messageContent);
+      // First try direct JSON.parse
+      aiResult = messageContent ? JSON.parse(messageContent) : null;
     } catch (parseError) {
       console.error('Failed to parse AI response as JSON:', parseError);
-      console.error('Raw content:', data.choices[0].message.content);
-      
-      // Fallback: If GPT-5 isn't returning JSON, create a structured response
-      // This might happen with temperature=1 making the output less structured
-      const rawContent = data.choices[0].message.content;
+      console.error('Raw content:', messageContent);
+      // Try to extract the first JSON object if any extra text surrounds it
+      aiResult = extractFirstJsonObject(messageContent);
+    }
+
+    // As a final fallback, synthesize a structured result if parsing failed or content is empty
+    if (!aiResult) {
+      const rawContent = messageContent || '';
+      if (!rawContent) {
+        throw new Error('AI response was empty after retries. Please try again or choose a different model.');
+      }
       aiResult = {
         linkedinPost: rawContent,
         summary: rawContent,
-        category: categories[0] || '🚀 Developer Productivity',
+        category: availableCategories[0],
         isNewCategory: false,
         characterCount: rawContent.length
       };
@@ -258,8 +345,7 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
     }
     
     // Ensure we only have one category (in case AI returns multiple)
-    if (aiResult.category && aiResult.category.includes(',')) {
-      // If multiple categories are returned, take only the first one
+    if (aiResult.category && typeof aiResult.category === 'string' && aiResult.category.includes(',')) {
       aiResult.category = aiResult.category.split(',')[0].trim();
     }
     
