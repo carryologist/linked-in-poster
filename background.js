@@ -205,8 +205,9 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
     // Add the appropriate parameters based on model type
     if (isGPT5Model) {
       apiBody.max_completion_tokens = 500;
-      // GPT-5 models only support default temperature (1), so we don't set it
-      console.log('Using max_completion_tokens for GPT-5 model (no temperature)');
+      // GPT-5 models need response_format to output JSON properly
+      apiBody.response_format = { type: "json_object" };
+      console.log('Using max_completion_tokens for GPT-5 model with JSON response format');
     } else {
       apiBody.max_tokens = 500;
       apiBody.temperature = 0.3; // Only set temperature for non-GPT-5 models
