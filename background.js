@@ -79,9 +79,7 @@ async function callOpenAIResponses({ model, input, maxOutputTokens }, apiKey) {
   const body = {
     model,
     input,
-    modalities: ['text'],
     text: { format: 'json_object' },
-    reasoning: { effort: 'low' },
     max_output_tokens: maxOutputTokens
   };
   console.log('Responses API request body:', JSON.stringify(body));
@@ -330,7 +328,24 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
       selectedModel.toLowerCase().includes('gpt5')
     );
     
-    // Base API body
+    // Try Responses API first for GPT-5 models
+    let data = null;
+    let messageContent = '';
+    if (isGPT5Model) {
+      try {
+        const resp = await callOpenAIResponses({
+          model: selectedModel,
+          input: prompt,
+          maxOutputTokens: 1500
+        }, openaiApiKey);
+        messageContent = extractTextFromResponsesAPI(resp) || '';
+        console.log('Responses API text to parse:', messageContent);
+      } catch (e) {
+        console.warn('Responses API primary attempt failed, falling back to Chat Completions:', e);
+      }
+    }
+
+    // If we still have no content, proceed with Chat Completions attempts
     const baseApiBody = {
       model: selectedModel,
       messages: [{
@@ -339,13 +354,10 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
       }]
     };
 
-    // Build attempt-specific bodies and retry if needed
     let attempt = 1;
-    let data = null;
-    let messageContent = '';
     let finishReason = '';
 
-    while (attempt <= 2) {
+    while ((!messageContent || !messageContent.trim()) && attempt <= 2) {
       const apiBody = { ...baseApiBody };
       if (isGPT5Model) {
         // GPT-5 Chat Completions expect max_completion_tokens
@@ -366,33 +378,13 @@ Generate the LinkedIn post now and return ONLY the JSON object above.`;
       finishReason = (data && data.choices && data.choices[0] && data.choices[0].finish_reason) || '';
       console.log('Message content to parse:', messageContent);
 
-      // Break early if we have content and model signaled stop
       if (messageContent && finishReason === 'stop') break;
-
-      // If empty or truncated, retry once with larger budget
       if ((!messageContent || finishReason === 'length') && attempt === 1) {
         console.warn('Empty or truncated response, retrying with larger token budget...');
         attempt++;
         continue;
       }
-
-      // Otherwise exit loop
       break;
-    }
-
-    // If still empty after chat retries and we're using GPT-5, try the Responses API as a last resort
-    if ((!messageContent || !messageContent.trim()) && isGPT5Model) {
-      try {
-        const resp = await callOpenAIResponses({
-          model: selectedModel,
-          input: prompt,
-          maxOutputTokens: 1500
-        }, openaiApiKey);
-        messageContent = extractTextFromResponsesAPI(resp) || '';
-        console.log('Responses API text to parse:', messageContent);
-      } catch (e) {
-        console.error('Responses API fallback failed:', e);
-      }
     }
 
     let aiResult;
