@@ -79,7 +79,7 @@ async function callOpenAIResponses({ model, input, maxOutputTokens }, apiKey) {
   const body = {
     model,
     input,
-    text: { format: 'json_object' },
+    text: { format: { type: 'json_object' } },
     max_output_tokens: maxOutputTokens
   };
   console.log('Responses API request body:', JSON.stringify(body));
