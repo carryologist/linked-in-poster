@@ -6,6 +6,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   statusEl.textContent = 'Processing';
   statusEl.className = 'status processing';
 
+  // Full view button
+  const fullBtn = document.getElementById('openFullView');
+  if (fullBtn) {
+    fullBtn.addEventListener('click', () => {
+      const url = chrome.runtime.getURL('popup.html');
+      chrome.windows.create({ url, type: 'popup', focused: true, width: 900, height: 900 });
+    });
+  }
+
   // Populate model picker
   initModelPicker().catch(console.error);
 
